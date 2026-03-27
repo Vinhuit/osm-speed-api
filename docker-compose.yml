@@ -1,0 +1,70 @@
+services:
+  db:
+    image: postgis/postgis:17-3.5
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: osm
+      POSTGRES_USER: osm
+      POSTGRES_PASSWORD: osm
+    ports:
+      - "5432:5432"
+    volumes:
+      - ./postgres-data:/var/lib/postgresql/data
+      - ./db:/sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U osm -d osm"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    image: caubequay00/speedapiosm-api:latest
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      DATABASE_URL: postgres://osm:osm@db:5432/osm
+      DEFAULT_SEARCH_RADIUS_METERS: 60
+      MAX_SEARCH_RADIUS_METERS: 250
+    ports:
+      - "3000:3000"
+
+  downloader:
+    image: curlimages/curl:8.16.0
+    profiles: ["tools"]
+    user: "0:0"
+    environment:
+      PBF_FILENAME: ${PBF_FILENAME:-vietnam-latest.osm.pbf}
+      PBF_DOWNLOAD_URL: ${PBF_DOWNLOAD_URL:-https://download.geofabrik.de/asia/vietnam-latest.osm.pbf}
+    volumes:
+      - ${PBF_DATA_DIR:-./data}:/data
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - |
+        set -eu
+        target="/data/$${PBF_FILENAME}"
+        if [ -s "$$target" ]; then
+          echo "PBF already exists at $$target"
+          ls -lh "$$target"
+        else
+          echo "Downloading $${PBF_DOWNLOAD_URL} -> $$target"
+          curl -fL "$${PBF_DOWNLOAD_URL}" -o "$$target"
+          ls -lh "$$target"
+        fi
+
+  importer:
+    image: caubequay00/speedapiosm-importer:latest
+    profiles: ["tools"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGPASSWORD: osm
+      PBF_FILENAME: ${PBF_FILENAME:-vietnam-latest.osm.pbf}
+    entrypoint: ["/usr/local/bin/import-osm.sh"]
+    volumes:
+      - ${PBF_DATA_DIR:-./data}:/data

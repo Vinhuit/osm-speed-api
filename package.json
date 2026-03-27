@@ -1,0 +1,27 @@
+{
+  "name": "speedapiosm",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Local speed-limit API backed by OpenStreetMap + PostGIS.",
+  "scripts": {
+    "dev": "node --watch src/server.js",
+    "start": "node src/server.js",
+    "test": "node --test",
+    "docker:build": "docker compose -f docker-compose.build.yml build",
+    "docker:push": "docker compose -f docker-compose.build.yml push",
+    "docker:up": "docker compose up -d db api",
+    "docker:down": "docker compose down",
+    "docker:logs": "docker compose logs -f api db",
+    "docker:download": "docker compose --profile tools run --rm downloader",
+    "docker:import": "docker compose --profile tools run --rm importer"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0",
+    "pg": "^8.13.1"
+  }
+}

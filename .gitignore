@@ -1,0 +1,8 @@
+node_modules/
+.env
+postgres-data/
+data/*.osm.pbf
+data/*.osm.bz2
+data/*.state.txt
+coverage/
+*.log

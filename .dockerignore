@@ -1,0 +1,8 @@
+node_modules
+npm-debug.log
+.env
+postgres-data
+data
+README.md
+test
+db

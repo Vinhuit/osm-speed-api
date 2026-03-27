@@ -1,0 +1,12 @@
+services:
+  api:
+    image: caubequay00/speedapiosm-api:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+
+  importer:
+    image: caubequay00/speedapiosm-importer:latest
+    build:
+      context: .
+      dockerfile: docker/importer/Dockerfile
