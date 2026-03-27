@@ -1,128 +1,137 @@
-# Speed Limit API from Geofabrik Vietnam
+# OSM Speed API
 
-API local để lấy `speed_limit` theo GPS (`lat/lon`) cho app navigation, dùng dữ liệu OpenStreetMap tải từ Geofabrik và query trong PostGIS nên:
+A local API for retrieving `speed_limit` from GPS coordinates (`lat/lon`) for navigation apps, using OpenStreetMap data from Geofabrik and PostGIS for fast local queries.
 
-- nhanh
-- không bị rate limit
-- chủ động toàn bộ dữ liệu local
+- fast
+- no rate limits
+- fully local data ownership
 
 ## Stack
 
 - Node.js + Express
 - PostgreSQL + PostGIS
-- Docker Compose cho `db + api + downloader + importer`
-- `api` và `importer` pull trực tiếp từ Docker Hub:
-- `caubequay00/speedapiosm-api:latest`
-- `caubequay00/speedapiosm-importer:latest`
-- `osm2pgsql` flex import vào bảng `public.speed_roads`
-- Dữ liệu nguồn: `https://download.geofabrik.de/asia/vietnam-latest.osm.pbf`
+- Docker Compose for `db + api + downloader + importer`
+- image names are environment-driven:
+- `IMAGE_API=osm-speed-api:latest`
+- `IMAGE_IMPORTER=osm-speed-importer:latest`
+- `osm2pgsql` flex import into `public.speed_roads`
+- Source data: `https://download.geofabrik.de/asia/vietnam-latest.osm.pbf`
 
-## Chạy trong Docker
+## Run with Docker
 
-File `.pbf` được lưu local trên máy và mount vào container importer để tái sử dụng. Mặc định thư mục mount là:
+The `.pbf` file is stored locally on your machine and mounted into the importer container for reuse. The default mount directory is:
 
 ```text
 ./data
 ```
 
-Bạn có thể đổi sang thư mục khác, ví dụ:
+You can change it to another directory, for example:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Sửa trong `.env`:
+Edit `.env`:
 
 ```text
 PBF_DATA_DIR=D:/osm-data/vietnam
+POSTGRES_PASSWORD=change-me
 ```
 
-Sau đó đặt file ở:
+Then place the file here:
 
 ```text
 D:/osm-data/vietnam/vietnam-latest.osm.pbf
 ```
 
-1. Tải file `.pbf` bằng container downloader:
+1. Download the `.pbf` file with the downloader container:
 
 ```powershell
 docker compose run --rm downloader
 ```
 
-hoặc:
+or:
 
 ```powershell
 npm run docker:download
 ```
 
-2. Import vào PostGIS bằng container importer:
+2. Import the data into PostGIS with the importer container:
 
 ```powershell
 docker compose run --rm importer
 ```
 
-hoặc:
+or:
 
 ```powershell
 npm run docker:import
 ```
 
-Bạn cũng có thể tự đặt sẵn file tại local mount:
+You can also place the file manually in the local mount:
 
 ```text
 data/vietnam-latest.osm.pbf
 ```
 
-3. Chạy API:
+3. Start the API:
 
 ```powershell
 docker compose up -d api
 ```
 
-hoặc:
+or:
 
 ```powershell
 npm run docker:up
 ```
 
-Máy khác không cần build local image, chỉ cần `docker compose` pull/run là đủ.
+Other machines do not need local image builds. `docker compose` pull/run is enough.
 
-## Build image
+If you want to pull from a registry, set custom image names in `.env`:
 
-Nếu cần build lại image và push lên Docker Hub:
+```text
+IMAGE_API=your-registry/osm-speed-api:latest
+IMAGE_IMPORTER=your-registry/osm-speed-importer:latest
+```
+
+## Build Images
+
+If you need to rebuild and push images to Docker Hub:
 
 ```powershell
 docker compose -f docker-compose.build.yml build
 docker compose -f docker-compose.build.yml push
 ```
 
-hoặc:
+or:
 
 ```powershell
 npm run docker:build
 npm run docker:push
 ```
 
-File build riêng là:
+The dedicated build file is:
 
 ```text
 docker-compose.build.yml
 ```
 
-Nếu dùng thư mục mount riêng ngoài project:
+If you use a custom external mount directory:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-Sửa `.env`:
+Edit `.env`:
 
 ```text
 PBF_DATA_DIR=D:/osm-data/vietnam
 PBF_FILENAME=vietnam-latest.osm.pbf
+POSTGRES_PASSWORD=change-me
 ```
 
-Rồi chạy đúng 3 lệnh:
+Then run the same 3 commands:
 
 ```powershell
 docker compose run --rm downloader
@@ -130,15 +139,15 @@ docker compose run --rm importer
 docker compose up -d api
 ```
 
-`importer` sẽ tự:
+The `importer` will automatically:
 
-- kiểm tra file `.pbf` trong volume local
-- dùng style `speed_roads.lua` đã đóng gói sẵn trong image
-- `DROP TABLE public.speed_roads` cũ nếu đã có
-- import lại bằng `osm2pgsql`
-- tự kéo `db` lên nếu dependency chưa chạy
+- verify the `.pbf` file in the local volume
+- use the bundled `speed_roads.lua` style file from the image
+- `DROP TABLE public.speed_roads` if it already exists
+- import again with `osm2pgsql`
+- start `db` automatically if the dependency is not running yet
 
-Xem log:
+View logs:
 
 ```powershell
 npm run docker:logs
@@ -148,7 +157,7 @@ npm run docker:logs
 
 ### `GET /api/speed-limit`
 
-Ví dụ:
+Example:
 
 ```text
 GET /api/speed-limit?lat=10.77689&lon=106.70081&heading=85
@@ -165,7 +174,7 @@ GET /api/speed-limit?lat=10.77689&lon=106.70081&heading=85
 }
 ```
 
-## Response mẫu
+## Example Response
 
 ```json
 {
@@ -208,15 +217,17 @@ GET /api/speed-limit?lat=10.77689&lon=106.70081&heading=85
 }
 ```
 
-## Ghi chú dữ liệu
+## Notes
 
-- API trả road gần nhất trong bán kính tìm kiếm và ưu tiên road có `maxspeed` explicit.
-- `road.name` là tên gốc của segment OSM; `road.displayName` là tên hiển thị sau khi fallback sang segment lân cận, `ref`, hoặc nhãn kiểu `Unnamed service`.
-- `heading` là optional, nhưng nếu app navigation gửi được thì API sẽ chọn đúng `maxspeed:forward` hoặc `maxspeed:backward` tốt hơn.
-- Nếu road gần nhất không có `maxspeed` trong OSM thì `road.speedLimit` sẽ là `null`.
-- Dữ liệu tốc độ phụ thuộc chất lượng tag OSM ở từng khu vực.
+- The API returns the nearest road within the search radius and prefers roads with explicit `maxspeed`.
+- `road.name` is the raw OSM segment name. `road.displayName` is the display label after falling back to a nearby segment name, `ref`, or a label like `Unnamed service`.
+- `heading` is optional, but if the navigation app sends it, the API can choose `maxspeed:forward` or `maxspeed:backward` more accurately.
+- If the nearest road has no `maxspeed` tag in OSM, `road.speedLimit` will be `null`.
+- Speed data quality depends on OSM tagging coverage in each area.
+- Postgres credentials are environment-driven. Change `POSTGRES_PASSWORD` before using this outside local development.
+- Postgres is only bound to `127.0.0.1` by default.
 
-## Chạy local không Docker
+## Run Locally Without Docker
 
 ```powershell
 npm install
@@ -224,7 +235,7 @@ Copy-Item .env.example .env
 npm start
 ```
 
-## Lệnh hữu ích
+## Useful Commands
 
 ```powershell
 npm run docker:download

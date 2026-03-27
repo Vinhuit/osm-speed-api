@@ -3,11 +3,11 @@ services:
     image: postgis/postgis:17-3.5
     restart: unless-stopped
     environment:
-      POSTGRES_DB: osm
-      POSTGRES_USER: osm
-      POSTGRES_PASSWORD: osm
+      POSTGRES_DB: ${POSTGRES_DB:-osm}
+      POSTGRES_USER: ${POSTGRES_USER:-osm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
     ports:
-      - "5432:5432"
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
       - ./db:/sql
@@ -18,7 +18,7 @@ services:
       retries: 20
 
   api:
-    image: caubequay00/speedapiosm-api:latest
+    image: ${IMAGE_API:-osm-speed-api:latest}
     restart: unless-stopped
     depends_on:
       db:
@@ -26,7 +26,7 @@ services:
     environment:
       PORT: 3000
       HOST: 0.0.0.0
-      DATABASE_URL: postgres://osm:osm@db:5432/osm
+      DATABASE_URL: postgres://${POSTGRES_USER:-osm}:${POSTGRES_PASSWORD:-change-me}@db:5432/${POSTGRES_DB:-osm}
       DEFAULT_SEARCH_RADIUS_METERS: 60
       MAX_SEARCH_RADIUS_METERS: 250
     ports:
@@ -57,13 +57,13 @@ services:
         fi
 
   importer:
-    image: caubequay00/speedapiosm-importer:latest
+    image: ${IMAGE_IMPORTER:-osm-speed-importer:latest}
     profiles: ["tools"]
     depends_on:
       db:
         condition: service_healthy
     environment:
-      PGPASSWORD: osm
+      PGPASSWORD: ${POSTGRES_PASSWORD:-change-me}
       PBF_FILENAME: ${PBF_FILENAME:-vietnam-latest.osm.pbf}
     entrypoint: ["/usr/local/bin/import-osm.sh"]
     volumes:
